@@ -52,6 +52,7 @@ class EndpointDocstringGenerator:
         context: RenderContext,
         primary_content_type: str | None,
         response_strategy: ResponseStrategy,
+        ordered_params: list[dict[str, Any]] | None = None,
     ) -> None:
         """Writes the method docstring to the provided CodeWriter."""
         summary = op.summary or None
@@ -63,7 +64,14 @@ class EndpointDocstringGenerator:
             desc = param.description or ""
             args.append((param.name, param_type, desc))
 
-        if op.request_body and primary_content_type:
+        # Check if body was exploded into individual params
+        body_field_params = [p for p in (ordered_params or []) if p.get("param_in") == "body_field"]
+
+        if body_field_params:
+            # List individual body field params in docstring
+            for p in body_field_params:
+                args.append((p["name"], p["type"], p.get("description", "")))
+        elif op.request_body and primary_content_type:
             body_desc = op.request_body.description or "Request body."
             # Standardized body parameter names based on content type
             if primary_content_type == "multipart/form-data":

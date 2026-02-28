@@ -99,6 +99,7 @@ class TestEndpointMethodGenerator:
             ordered_params_fixture,
             primary_content_type_fixture,
             resolved_body_type_fixture,
+            False,  # body_exploded
         )
         mock_url_args_gen.return_value = False  # has_header_params
 
@@ -150,6 +151,8 @@ class TestEndpointMethodGenerator:
         assert docstring_args[3] == primary_content_type_fixture
         # docstring_args[4] should be a ResponseStrategy instance
         assert isinstance(docstring_args[4], ResponseStrategy)
+        # Check keyword arg ordered_params was passed
+        assert docstring_call_args[1].get("ordered_params") == ordered_params_fixture
 
         mock_url_args_gen.assert_called_once_with(
             mock_writer_instance,
@@ -226,7 +229,7 @@ class TestEndpointMethodGenerator:
         ]
         mock_code_writer_class.return_value = mock_writer_instance
 
-        mock_param_processor.return_value = ([], None, None)
+        mock_param_processor.return_value = ([], None, None, False)
         mock_url_args_gen.return_value = False
 
         generator = EndpointMethodGenerator(schemas={})

@@ -96,28 +96,30 @@ class TestEndpointParameterProcessor:
         # For this test, assume get_param_type and get_request_body_type return predictable strings
         # based on the simple IRSchema types provided.
 
-        ordered_params, primary_content_type, resolved_body_type = processor.process_parameters(
+        ordered_params, primary_content_type, resolved_body_type, body_exploded = processor.process_parameters(
             minimal_op_for_params, render_context_mock_for_params
         )
 
+        # MyBody has properties (id: int), so body should be exploded
+        assert body_exploded is True
         assert len(ordered_params) == 3
         # Path param (path_param) should be present (TypeHelper would make it 'int')
         assert any(p["name"] == "path_param" and p["param_in"] == "path" for p in ordered_params)
         # Query param (query_param) (TypeHelper would make it 'str')
         assert any(p["name"] == "query_param" and p["param_in"] == "query" for p in ordered_params)
-        # Body param (body)
-        assert any(p["name"] == "body" and p["param_in"] == "body" for p in ordered_params)
+        # Body field param (id -> id_ after sanitization) from exploded body
+        assert any(p["param_in"] == "body_field" for p in ordered_params)
 
-        # Check specific types (assuming simple direct mapping or future mocking of TypeHelper)
-        # This part might need adjustment based on actual TypeHelper behavior / mocking strategy
+        # Check specific types
         path_param_info = next(p for p in ordered_params if p["name"] == "path_param")
         assert path_param_info["type"] == "int"  # Based on IRSchema(type="integer")
 
         query_param_info = next(p for p in ordered_params if p["name"] == "query_param")
         assert query_param_info["type"] == "str"  # Based on IRSchema(type="string")
 
-        body_param_info = next(p for p in ordered_params if p["name"] == "body")
-        assert body_param_info["type"] == "MyBody"  # Based on IRSchema(type="object", name="MyBody")
+        body_field_info = next(p for p in ordered_params if p["param_in"] == "body_field")
+        assert body_field_info["original_name"] == "id"
+        assert body_field_info["body_model_type"] == "MyBody"
 
         assert primary_content_type == "application/json"
         assert resolved_body_type == "MyBody"
@@ -134,7 +136,9 @@ class TestEndpointParameterProcessor:
             ],
             responses=[],
         )
-        ordered_params_missing, _, _ = processor.process_parameters(op_missing_path_var, render_context_mock_for_params)
+        ordered_params_missing, _, _, _ = processor.process_parameters(
+            op_missing_path_var, render_context_mock_for_params
+        )
         assert any(
             p["name"] == "another_path_var" and p["param_in"] == "path" and p["type"] == "str"
             for p in ordered_params_missing
@@ -170,7 +174,7 @@ class TestEndpointParameterProcessor:
         )
 
         processor = EndpointParameterProcessor(schemas=schemas_for_params)
-        ordered_params, primary_content_type, resolved_body_type = processor.process_parameters(
+        ordered_params, primary_content_type, resolved_body_type, _body_exploded = processor.process_parameters(
             op_multipart, render_context_mock_for_params
         )
 
@@ -219,7 +223,7 @@ class TestEndpointParameterProcessor:
         )
 
         processor = EndpointParameterProcessor(schemas=schemas_for_params)
-        ordered_params, _, _ = processor.process_parameters(op_with_header, render_context_mock_for_params)
+        ordered_params, _, _, _ = processor.process_parameters(op_with_header, render_context_mock_for_params)
 
         assert len(ordered_params) == 1
         header_param_info = ordered_params[0]
@@ -271,7 +275,7 @@ class TestEndpointParameterProcessor:
         )
 
         processor = EndpointParameterProcessor(schemas=schemas_for_params)
-        ordered_params, _, _ = processor.process_parameters(op_with_cookie, render_context_mock_for_params)
+        ordered_params, _, _, _ = processor.process_parameters(op_with_cookie, render_context_mock_for_params)
 
         assert len(ordered_params) == 2
 
@@ -318,7 +322,7 @@ class TestEndpointParameterProcessor:
         )
 
         processor = EndpointParameterProcessor(schemas=schemas_for_params)
-        ordered_params, primary_content_type, resolved_body_type = processor.process_parameters(
+        ordered_params, primary_content_type, resolved_body_type, _body_exploded = processor.process_parameters(
             op_form_urlencoded, render_context_mock_for_params
         )
 
@@ -366,7 +370,7 @@ class TestEndpointParameterProcessor:
         )
 
         processor = EndpointParameterProcessor(schemas=schemas_for_params)
-        ordered_params, primary_content_type, resolved_body_type = processor.process_parameters(
+        ordered_params, primary_content_type, resolved_body_type, _body_exploded = processor.process_parameters(
             op_fallback_body, render_context_mock_for_params
         )
 
@@ -411,7 +415,7 @@ class TestEndpointParameterProcessor:
         processor = EndpointParameterProcessor(schemas=schemas_for_params)
 
         with patch("pyopenapi_gen.visit.endpoint.processors.parameter_processor.logger") as mock_logger:
-            ordered_params, _, _ = processor.process_parameters(op_colliding, render_context_mock_for_params)
+            ordered_params, _, _, _ = processor.process_parameters(op_colliding, render_context_mock_for_params)
 
         mock_logger.warning.assert_called_once()
         # Check that the logged message contains key parts of the expected warning

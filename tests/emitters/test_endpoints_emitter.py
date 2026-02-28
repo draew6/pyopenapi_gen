@@ -817,17 +817,17 @@ def test_endpoints_emitter__query_params_included_in_params_dict(
     assert '"tenant_id": tenant_id' not in content
 
 
-def test_endpoints_emitter__post_with_body__only_body_param_and_path_query_args(
+def test_endpoints_emitter__post_with_body__explodes_body_fields_as_keyword_only_params(
     tmp_path: Path, mock_render_context: MagicMock
 ) -> None:
     """
     Scenario:
         - A POST endpoint has path params and a JSON request body with multiple fields.
-        - The code generator should only include path/query params and a single 'body' argument in the method signature.
-        - The body fields should NOT appear as top-level method arguments.
+        - The body schema is explorable (object with properties, no compositions).
 
     Expected Outcome:
-        - The generated method signature contains only path/query params and 'body', not the body fields.
+        - Path params appear as positional args, body fields as keyword-only params.
+        - Body is reconstructed from individual params in the method body.
     """
     # Arrange: Create IR for a POST endpoint with path params and a JSON body
     from pyopenapi_gen import HTTPMethod, IROperation, IRParameter, IRRequestBody, IRSchema, IRSpec
@@ -880,10 +880,13 @@ def test_endpoints_emitter__post_with_body__only_body_param_and_path_query_args(
     assert search_file.exists()
     content = search_file.read_text()
 
-    # Assert: The method signature should have only tenant_id and body, not searchPhrase/instructions
+    # Assert: Body fields appear as keyword-only params (after * separator)
     assert "class SearchClient" in content
     assert "async def elaborate_search_phrase(" in content
     assert "tenant_id: str," in content
-    assert "body: ElaborateSearchPhraseRequest" in content
-    assert "searchPhrase:" not in content
-    assert "instructions:" not in content
+    # Body fields should appear as individual keyword-only params (sanitized to snake_case)
+    assert "search_phrase: str" in content
+    assert "instructions: str" in content
+    # Body is reconstructed from individual params
+    assert "_body = ElaborateSearchPhraseRequest(" in content
+    assert "DataclassSerializer.serialize(_body)" in content

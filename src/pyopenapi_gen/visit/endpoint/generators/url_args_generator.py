@@ -155,20 +155,37 @@ class EndpointUrlArgsGenerator:
             context.add_import(f"{context.core_package_name}.utils", "DataclassSerializer")
 
             if primary_content_type == "application/json":
-                body_param_detail = next((p for p in ordered_params if p["name"] == "body"), None)
-                if body_param_detail:
-                    actual_body_type_from_signature = body_param_detail["type"]
-                    context.add_typing_imports_for_type(actual_body_type_from_signature)
-                    writer.write_line(
-                        f"json_body: {actual_body_type_from_signature} = DataclassSerializer.serialize(body)"
+                # Check if body was exploded into individual params
+                body_field_params = [p for p in ordered_params if p.get("param_in") == "body_field"]
+                if body_field_params:
+                    # Reconstruct the model from individual params
+                    body_model_type = body_field_params[0].get("body_model_type", "Any")
+                    # Strip "| None" suffix for constructor call
+                    constructor_type = body_model_type.replace(" | None", "").strip()
+                    context.add_typing_imports_for_type(body_model_type)
+                    field_args = ", ".join(
+                        f"{NameSanitizer.sanitize_method_name(p['original_name'])}="
+                        f"{NameSanitizer.sanitize_method_name(p['name'])}"
+                        for p in body_field_params
                     )
-                else:
-                    logger.warning(
-                        f"Operation {op.operation_id}: 'body' parameter not found in "
-                        f"ordered_params for JSON. Defaulting to Any."
-                    )
+                    writer.write_line(f"_body = {constructor_type}({field_args})")
                     context.add_import("typing", "Any")
-                    writer.write_line("json_body: Any = DataclassSerializer.serialize(body)  # param not found")
+                    writer.write_line("json_body: Any = DataclassSerializer.serialize(_body)")
+                else:
+                    body_param_detail = next((p for p in ordered_params if p["name"] == "body"), None)
+                    if body_param_detail:
+                        actual_body_type_from_signature = body_param_detail["type"]
+                        context.add_typing_imports_for_type(actual_body_type_from_signature)
+                        writer.write_line(
+                            f"json_body: {actual_body_type_from_signature} = DataclassSerializer.serialize(body)"
+                        )
+                    else:
+                        logger.warning(
+                            f"Operation {op.operation_id}: 'body' parameter not found in "
+                            f"ordered_params for JSON. Defaulting to Any."
+                        )
+                        context.add_import("typing", "Any")
+                        writer.write_line("json_body: Any = DataclassSerializer.serialize(body)  # param not found")
             elif primary_content_type == "multipart/form-data":
                 files_param_details = next((p for p in ordered_params if p["name"] == "files"), None)
                 if files_param_details:

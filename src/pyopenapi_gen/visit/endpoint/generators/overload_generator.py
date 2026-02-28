@@ -221,7 +221,7 @@ class OverloadMethodGenerator:
 
         # Add all possible content-type parameters as optional
         if op.request_body:
-            param_types_seen = set()
+            param_types_seen: set[str] = set()
 
             for content_type, schema in op.request_body.content.items():
                 param_info = self._get_content_type_param_info(content_type, schema, context)

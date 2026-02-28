@@ -64,8 +64,17 @@ class EndpointMethodSignatureGenerator:
                 break  # Found one, no need to check further
 
         args = ["self"]
+        has_body_fields = any(p.get("param_in") == "body_field" for p in ordered_params)
+        kw_separator_added = False
+
         for p_orig in ordered_params:
             p = p_orig.copy()  # Work with a copy
+
+            # Insert keyword-only separator before first body_field param
+            if has_body_fields and p.get("param_in") == "body_field" and not kw_separator_added:
+                args.append("*")
+                kw_separator_added = True
+
             arg_str = f"{NameSanitizer.sanitize_method_name(p['name'])}: {p['type']}"  # Ensure param name is sanitized
             if not p.get("required", False):
                 # For optional parameters, always default to None to avoid type mismatches

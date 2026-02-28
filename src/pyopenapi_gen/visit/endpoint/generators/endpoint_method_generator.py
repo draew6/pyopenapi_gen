@@ -66,14 +66,16 @@ class EndpointMethodGenerator:
         """Generate standard method without overloads."""
         writer = CodeWriter()
 
-        ordered_params, primary_content_type, resolved_body_type = self.parameter_processor.process_parameters(
-            op, context
+        ordered_params, primary_content_type, resolved_body_type, body_exploded = (
+            self.parameter_processor.process_parameters(op, context)
         )
 
         # Pass strategy to generators for consistent behavior
         self.signature_generator.generate_signature(writer, op, context, ordered_params, response_strategy)
 
-        self.docstring_generator.generate_docstring(writer, op, context, primary_content_type, response_strategy)
+        self.docstring_generator.generate_docstring(
+            writer, op, context, primary_content_type, response_strategy, ordered_params=ordered_params
+        )
 
         # Snapshot of code *before* main body parts are written
         # This includes signature and docstring.
@@ -139,7 +141,9 @@ class EndpointMethodGenerator:
         writer.write_block(impl_sig)
 
         # Generate docstring
-        ordered_params, primary_content_type, _ = self.parameter_processor.process_parameters(op, context)
+        ordered_params, primary_content_type, _, _body_exploded = self.parameter_processor.process_parameters(
+            op, context
+        )
         writer.indent()
         writer.write_line('"""')
         writer.write_line(f"{op.summary or op.operation_id}")
