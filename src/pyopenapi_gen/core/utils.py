@@ -248,8 +248,13 @@ class NameSanitizer:
             return operation_id
 
         path_suffix = f"_{normalized_path}"
-        if without_method.lower().endswith(path_suffix):
-            prefix = without_method[: -len(path_suffix)]
+        # Normalize without_method the same way as the path (collapse
+        # consecutive underscores, strip leading/trailing) so that raw
+        # operationIds like "get_prompt_prompts__prompt_id_" match the
+        # collapsed path suffix "_prompts_prompt_id".
+        normalized_without = re.sub(r"_+", "_", without_method).strip("_").lower()
+        if normalized_without.endswith(path_suffix):
+            prefix = normalized_without[: -len(path_suffix)]
             # 5. Guard against empty result
             if prefix:
                 return prefix
